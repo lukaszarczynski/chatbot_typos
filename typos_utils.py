@@ -1,5 +1,11 @@
+# coding=utf-8
+
+from __future__ import unicode_literals
+from codecs import open
+
 from collections import defaultdict
 import string
+
 
 def remove_polish_symbols(word):
     latin_equivalents = {
@@ -27,13 +33,13 @@ def remove_polish_symbols_and_duplicates(word):
 def get_unigrams(path="1grams", cutoff=1):
     print("+++ loading unigrams+++")
     unigrams = defaultdict(lambda: 0)
-    with open(path) as file:
+    with open(path, encoding="utf8") as file:
         for line in file:
-            occurrences, *word = line.replace(".", "").replace(",", "").replace("?", "").\
+            line = line.replace(".", "").replace(",", "").replace("?", "").\
                 replace("-", "").replace(":", "").replace("\"", "").split()
-            if len(word) != 1:
+            if len(line) != 2:
                 continue
-            word = word[0]
+            occurrences, word = line
             unigrams[word] += int(occurrences)
             if int(occurrences) <= cutoff:
                 break
@@ -87,9 +93,10 @@ def generate_near_words(word, edit_distance):
         near_words[i + 1] = one_step(near_words, i + 1)
     return near_words
 
+
 if __name__ == "__main__":
     print(generate_near_words("nauczycielka", 1))
-    print("nauyzccielka" in generate_near_words("nauczycielka", 1)[1])
+    assert "nauyzccielka" in generate_near_words("nauczycielka", 1)[1]
     print(remove_duplicates(remove_polish_symbols("łóożko")))
     d = {
         "lorem": 0,

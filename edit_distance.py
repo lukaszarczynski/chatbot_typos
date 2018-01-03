@@ -1,4 +1,18 @@
+# coding=utf-8
+
+from __future__ import unicode_literals, print_function
+
+import sys
+
+if sys.version_info.major < 3:
+    global input
+
+    def input(*args):
+        return raw_input(*args).decode("utf8")
+
+
 def edit_distance(word1, word2, insertion_cost=1, deletion_cost=1, substitution_cost=1, transposition_cost=1):
+    """Finds edit distance between two words with given costs (default: Damerau–Levenshtein distance)"""
     word1 = ' ' + word1
     word2 = ' ' + word2
     length1 = len(word1)
@@ -21,7 +35,9 @@ def edit_distance(word1, word2, insertion_cost=1, deletion_cost=1, substitution_
                                   A[i-2][j-2] + transposition_cost)
     return A[length1-1][length2-1]
 
+
 if __name__ == "__main__":
-    print("qwerty", "qwretz", edit_distance("qwerty", "qwretz"))
-    w1, w2 = input("> "), input("> ")
+    print("qwertyź", "qwretzź", edit_distance("qwertyź", "qwretzź"))
+    w1 = input("> ")
+    w2 = input("> ")
     print(edit_distance(w1, w2, 1, 1, 1, 1))

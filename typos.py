@@ -1,3 +1,8 @@
+# coding=utf-8
+
+from __future__ import print_function, unicode_literals, division
+from codecs import open
+
 from collections import defaultdict
 import sys
 
@@ -8,14 +13,6 @@ from typos_utils import remove_polish_symbols_and_duplicates, get_unigrams, norm
 
 
 MAX_EDIT_DISTANCE = 2
-
-
-def file_len(fname):
-    i = -1
-    with open(fname) as f:
-        for i, l in enumerate(f):
-            pass
-    return i + 1
 
 
 def more_search(near_words, morphosyntactic):
@@ -31,7 +28,7 @@ def more_search(near_words, morphosyntactic):
 # def fin_edit_distances(file_path="./literowki_dev1.txt"):
 #     ed = defaultdict(lambda: 0)
 #
-#     with open(file_path) as file:
+#     with open(file_path, encoding="utf8") as file:
 #         ambigous = 0
 #         missing = 0
 #         unigrams = get_unigrams()
@@ -62,14 +59,13 @@ def correct_typos(file_path="./literowki_dev1.txt", unigrams_path="1grams",
 
     max_time = 0
 
-    with open(file_path) as file:
+    with open(file_path, encoding="utf8") as file:
         t1 = time.time()
         ambigous2 = 0
         working = 0
-        _line_number = 0
+        line_number = -1
         for line_number, line in enumerate(file):
             t0 = time.time()
-            _line_number = line_number
             correct, wrong = line.split()
             possibly_corrected = []
             possibly_corrected_polish = []
@@ -128,9 +124,9 @@ def correct_typos(file_path="./literowki_dev1.txt", unigrams_path="1grams",
             max_time = max(max_time, time.time() - t0)
 
         print("Max time: ", max_time)
-        print("Average time: ", (time.time() - t1) / _line_number, _line_number)
+        print("Average time: ", (time.time() - t1) / line_number, line_number)
 
-    print(working / file_len(file_path))
+        print(working / line_number + 1)
 
 
 if __name__ == "__main__":

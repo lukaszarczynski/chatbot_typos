@@ -3,134 +3,180 @@
 from __future__ import print_function, unicode_literals, division
 from codecs import open
 
-from collections import defaultdict
 import sys
-
 import time
+import re
 
 from edit_distance import edit_distance
-from typos_utils import remove_polish_symbols_and_duplicates, get_unigrams, normalized_morphosyntactic, generate_near_words
+from typos_utils import remove_polish_symbols_and_duplicates, get_unigrams, normalized_morphosyntactic
+from typos_utils import generate_near_words, additional_search
+
+MAX_EDIT_DISTANCE = 1
+
+if sys.version_info.major < 3:
+    global input
+
+    def input(*args, **kwargs):
+        """input function similar to one from Python 3"""
+        return raw_input(*args, **kwargs).decode("utf8")
 
 
-MAX_EDIT_DISTANCE = 2
+class Typos(object):
+    """
+    Attempts to fix typos
+
+    :param unigrams_path: path to text file with unigrams (default: ./1grams)
+    :type unigrams_path: str
+    :param morph_dictionary_path: path to text file with morphosyntactic dictionary (default: ./polimorfologik-2.1.txt)
+    :type morph_dictionary_path: str
+    """
+    def __init__(self, unigrams_path="./1grams", morph_dictionary_path="./polimorfologik-2.1.txt"):
+        self.unigrams = get_unigrams(unigrams_path)
+        self.morphosyntactic = normalized_morphosyntactic(morph_dictionary_path)
+
+    def _select_correct_word(self, possibly_corrected_polish, wrong, near_words):
+        if len(possibly_corrected_polish) > 0:
+            min_edit_distance = edit_distance(
+                min(possibly_corrected_polish, key=lambda x: edit_distance(x[0], wrong))[0], wrong)
+            corrected = max(
+                possibly_corrected_polish,
+                key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
+        else:
+            more_distant_words = []
+            more_distant_word = additional_search(near_words[MAX_EDIT_DISTANCE], self.morphosyntactic)
+            if more_distant_word is None:
+                corrected = None
+            else:
+                for polish_word in self.morphosyntactic[more_distant_word]:
+                    more_distant_words.append((polish_word, self.unigrams[polish_word]))
+
+                if more_distant_words == []:
+                    corrected = None
+                else:
+                    min_edit_distance = edit_distance(
+                        min(more_distant_words, key=lambda x: edit_distance(x[0], wrong))[0], wrong)
+                    corrected = max(
+                        more_distant_words,
+                        key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
+        return corrected
+
+    def _find_possible_corrections(self, word_with_typo):
+        possible_corrections_without_polish_chars = []
+        possible_corrections = []
+        k = 0
+        near_words = generate_near_words(remove_polish_symbols_and_duplicates(word_with_typo), MAX_EDIT_DISTANCE)
+        for i in range(MAX_EDIT_DISTANCE + 1):
+            for w in near_words[i]:
+                if w in self.morphosyntactic:
+                    k += 1
+                    possible_corrections_without_polish_chars.append(w)
+            if k > 0:
+                break
+
+        for word in possible_corrections_without_polish_chars:
+            for polish_word in self.morphosyntactic[word]:
+                possible_corrections.append((polish_word, self.unigrams.get(polish_word, 0)))
+
+        return possible_corrections, near_words
+
+    def _correct(self, word_with_typo):
+        def contains_letter(word):
+            for char in word:
+                if char.isalpha():
+                    return True
+            return False
+
+        if not contains_letter(word_with_typo):
+            return word_with_typo, None
+        possible_corrections, near_words = self._find_possible_corrections(word_with_typo)
+        corrected = self._select_correct_word(possible_corrections, word_with_typo, near_words)
+        return corrected, possible_corrections
+
+    def correct(self, word_with_typo):
+        """
+        :param word_with_typo: Word to correct
+        :type word_with_typo: str
+        :return: Corrected word or word with typo if word shouldn't or couldn't be corrected
+        :rtype: str
+        """
+        corrected, _ = self._correct(word_with_typo.lower())
+        if corrected is None:
+            corrected = word_with_typo
+        return corrected
+
+    def correct_line(self, line):
+        """
+        :param line: Line to correct
+        :type line: str
+        :return: Line with corrected words unless word shouldn't or couldn't be corrected
+        :rtype: str
+        """
+        tokenized = re.split('([ęóąśłżźćń\w]+)', line.lower())
+        corrected = []
+        for token in tokenized:
+            corrected.append(self.correct(token))
+        return "".join(corrected)
 
 
-def more_search(near_words, morphosyntactic):
-    return None
-    # min_length = len(min(near_words, key=lambda x: len(x)))
-    # for word in near_words:
-    #     if len(word) <= min_length + 3:
-    #         for char_index in range(len(word), 0, -1):
-    #             if word[:char_index] + word[char_index + 1:] in morphosyntactic:
-    #                 return word[:char_index] + word[char_index + 1:]
+def print_results(line, correct_word, word_with_typo, corrected, possible_corrections, output):
+    print(line.split(), edit_distance(correct_word, word_with_typo), file=output)
+    print("\n".join([str(p) for p in possible_corrections]), file=output)
+    print("Corrected: ", corrected, file=output)
+    print("\n\n\n", file=output)
 
 
-# def fin_edit_distances(file_path="./literowki_dev1.txt"):
-#     ed = defaultdict(lambda: 0)
-#
-#     with open(file_path, encoding="utf8") as file:
-#         ambigous = 0
-#         missing = 0
-#         unigrams = get_unigrams()
-#         morphosyntactic = normalized_morphosyntactic(unigrams)
-#         for line in file:
-#             line = line.split()
-#             if len(line) == 2:
-#                 ed[edit_distance(remove_polish_symbols_and_duplicates(line[0]),
-#                                  remove_polish_symbols_and_duplicates(line[1]))] += 1
-#                 if len(morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]) > 1:
-#                     ambigous += 1
-#                     print("a", line[0],
-#                           [(amb_word, edit_distance(amb_word[0], line[1])) for amb_word in morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]])
-#                 if len(morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]) == 0:
-#                     missing += 1
-#                     print("m", line[0])
-#                 # if edit_distance(remove_polish_symbols_and_duplicates(line[0]),
-#                 #                  remove_polish_symbols_and_duplicates(line[1])) == 5:
-#                 #     print(line)
-#     print(missing, ambigous)
-#     print(ed)
+def test_correction_with_typos_file(typos_path="./literowki_dev1.txt", unigrams_path="./1grams",
+                                    morph_dictionary_path="./polimorfologik-2.1.txt"):
+    typos = Typos(unigrams_path, morph_dictionary_path)
 
-
-def correct_typos(file_path="./literowki_dev1.txt", unigrams_path="1grams",
-                  morph_dictionary_path="./polimorfologik-2.1.txt"):
-    unigrams = get_unigrams(unigrams_path)
-    morphosyntactic = normalized_morphosyntactic(unigrams, morph_dictionary_path)
-
-    max_time = 0
-
-    with open(file_path, encoding="utf8") as file:
+    with open(typos_path, encoding="utf8") as file:
+        max_time = 0
         t1 = time.time()
-        ambigous2 = 0
-        working = 0
+        number_of_good_corrections = 0
         line_number = -1
         for line_number, line in enumerate(file):
             t0 = time.time()
-            correct, wrong = line.split()
-            possibly_corrected = []
-            possibly_corrected_polish = []
-            k = 0
-            near_words = generate_near_words(remove_polish_symbols_and_duplicates(wrong), MAX_EDIT_DISTANCE)
-            for i in range(MAX_EDIT_DISTANCE + 1):
-                for w in near_words[i]:
-                    if w in morphosyntactic:
-                        k += 1
-                        possibly_corrected.append(w)
-                if k > 0:
-                    break
-            if k > 1:
-                ambigous2 += 1
 
-            for word in possibly_corrected:
-                for polish_word in morphosyntactic[word]:
-                    possibly_corrected_polish.append((polish_word, unigrams.get(polish_word, 0)))
+            correct_word, word_with_typo = line.split()
 
-            if len(possibly_corrected_polish) > 0:
-                min_edit_distance = edit_distance(
-                    min(possibly_corrected_polish, key=lambda x: edit_distance(x[0], wrong))[0], wrong)
-                corrected = max(
-                    possibly_corrected_polish,
-                    key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
+            corrected, possible_corrections = typos._correct(word_with_typo)
+
+            if corrected == correct_word:
+                number_of_good_corrections += 1
+                output = sys.stdout
             else:
-                # more_distant_words = []
-                more_distant_word = more_search(near_words[MAX_EDIT_DISTANCE], morphosyntactic)
-                if more_distant_word is None:
-                    corrected = "okoń"
-                else:
-                    pass
-                    # for polish_word in morphosyntactic[more_distant_word]:
-                    #     more_distant_words.append((polish_word, unigrams[polish_word]))
-                    #
-                    # if more_distant_words == []:
-                    #     corrected = "okoń"
-                    # else:
-                    #     min_edit_distance = edit_distance(
-                    #         min(more_distant_words, key=lambda x: edit_distance(x[0], wrong))[0], wrong)
-                    #     corrected = max(
-                    #         more_distant_words,
-                    #         key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
+                output = sys.stderr
 
-            if corrected == correct:
-                working += 1
-                print(line.split(), edit_distance(correct, wrong))
-                print("\n".join([str(p) for p in possibly_corrected_polish]))
-                print("c ", corrected)
-                print("\n\n\n")
-            else:
-                print(line.split(), edit_distance(correct, wrong), file=sys.stderr)
-                print("\n".join([str(p) for p in possibly_corrected_polish]), file=sys.stderr)
-                print("c ", corrected, file=sys.stderr)
-                print("\n\n\n", file=sys.stderr)
+            print_results(line, correct_word, word_with_typo, corrected, possible_corrections, output)
+
             max_time = max(max_time, time.time() - t0)
 
         print("Max time: ", max_time)
         print("Average time: ", (time.time() - t1) / line_number, line_number)
-
-        print(working / line_number + 1)
+        print("Accuracy: ", number_of_good_corrections / (line_number + 1))
+    return typos
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        correct_typos(sys.argv[1], sys.argv[2], sys.argv[3])
-    else:
-        correct_typos()
+    kwargs = {}
+
+    filenames = ("literówkami (domyślnie ./literowki_dev1.txt)",
+                 "unigramami (domyślnie ./1grams)",
+                 "słownikiem morfosyntaktycznym (domyślnie ./polimorfologik-2.1.txt)")
+
+    typos_path, unigrams_path, morph_dictionary_path = "", "", ""
+    file_paths = (typos_path, unigrams_path, morph_dictionary_path)
+    variable_names = ("typos_path", "unigrams_path", "morph_dictionary_path")
+
+    for name, path, variable_name in zip(filenames, file_paths, variable_names):
+        print("Wprowadź ścieżkę do pliku z ", name)
+        path = input().strip()
+        if path != "":
+            kwargs[variable_name] = path
+
+    typos = test_correction_with_typos_file(**kwargs)
+    line_with_typos = input("> ").strip()
+    while line_with_typos != "":
+        corrected = typos.correct_line(line_with_typos)
+        print(corrected)
+        line_with_typos = input("> ").strip()

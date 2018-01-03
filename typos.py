@@ -19,39 +19,40 @@ def file_len(fname):
 
 
 def more_search(near_words, morphosyntactic):
-    min_length = len(min(near_words, key=lambda x: len(x)))
-    for word in near_words:
-        if len(word) <= min_length + 3:
-            for char_index in range(len(word), 0, -1):
-                if word[:char_index] + word[char_index + 1:] in morphosyntactic:
-                    return word[:char_index] + word[char_index + 1:]
+    return None
+    # min_length = len(min(near_words, key=lambda x: len(x)))
+    # for word in near_words:
+    #     if len(word) <= min_length + 3:
+    #         for char_index in range(len(word), 0, -1):
+    #             if word[:char_index] + word[char_index + 1:] in morphosyntactic:
+    #                 return word[:char_index] + word[char_index + 1:]
 
 
-def fin_edit_distances(file_path="./literowki_dev1.txt"):
-    ed = defaultdict(lambda: 0)
-
-    with open(file_path) as file:
-        ambigous = 0
-        missing = 0
-        unigrams = get_unigrams()
-        morphosyntactic = normalized_morphosyntactic(unigrams)
-        for line in file:
-            line = line.split()
-            if len(line) == 2:
-                ed[edit_distance(remove_polish_symbols_and_duplicates(line[0]),
-                                 remove_polish_symbols_and_duplicates(line[1]))] += 1
-                if len(morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]) > 1:
-                    ambigous += 1
-                    print("a", line[0],
-                          [(amb_word, edit_distance(amb_word[0], line[1])) for amb_word in morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]])
-                if len(morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]) == 0:
-                    missing += 1
-                    print("m", line[0])
-                # if edit_distance(remove_polish_symbols_and_duplicates(line[0]),
-                #                  remove_polish_symbols_and_duplicates(line[1])) == 5:
-                #     print(line)
-    print(missing, ambigous)
-    print(ed)
+# def fin_edit_distances(file_path="./literowki_dev1.txt"):
+#     ed = defaultdict(lambda: 0)
+#
+#     with open(file_path) as file:
+#         ambigous = 0
+#         missing = 0
+#         unigrams = get_unigrams()
+#         morphosyntactic = normalized_morphosyntactic(unigrams)
+#         for line in file:
+#             line = line.split()
+#             if len(line) == 2:
+#                 ed[edit_distance(remove_polish_symbols_and_duplicates(line[0]),
+#                                  remove_polish_symbols_and_duplicates(line[1]))] += 1
+#                 if len(morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]) > 1:
+#                     ambigous += 1
+#                     print("a", line[0],
+#                           [(amb_word, edit_distance(amb_word[0], line[1])) for amb_word in morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]])
+#                 if len(morphosyntactic[remove_polish_symbols_and_duplicates(line[0])]) == 0:
+#                     missing += 1
+#                     print("m", line[0])
+#                 # if edit_distance(remove_polish_symbols_and_duplicates(line[0]),
+#                 #                  remove_polish_symbols_and_duplicates(line[1])) == 5:
+#                 #     print(line)
+#     print(missing, ambigous)
+#     print(ed)
 
 
 def correct_typos(file_path="./literowki_dev1.txt", unigrams_path="1grams",
@@ -95,22 +96,23 @@ def correct_typos(file_path="./literowki_dev1.txt", unigrams_path="1grams",
                     possibly_corrected_polish,
                     key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
             else:
-                more_distant_words = []
+                # more_distant_words = []
                 more_distant_word = more_search(near_words[MAX_EDIT_DISTANCE], morphosyntactic)
                 if more_distant_word is None:
                     corrected = "okoń"
                 else:
-                    for polish_word in morphosyntactic[more_distant_word]:
-                        more_distant_words.append((polish_word, unigrams[polish_word]))
-
-                    if more_distant_words == []:
-                        corrected = "okoń"
-                    else:
-                        min_edit_distance = edit_distance(
-                            min(more_distant_words, key=lambda x: edit_distance(x[0], wrong))[0], wrong)
-                        corrected = max(
-                            more_distant_words,
-                            key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
+                    pass
+                    # for polish_word in morphosyntactic[more_distant_word]:
+                    #     more_distant_words.append((polish_word, unigrams[polish_word]))
+                    #
+                    # if more_distant_words == []:
+                    #     corrected = "okoń"
+                    # else:
+                    #     min_edit_distance = edit_distance(
+                    #         min(more_distant_words, key=lambda x: edit_distance(x[0], wrong))[0], wrong)
+                    #     corrected = max(
+                    #         more_distant_words,
+                    #         key=lambda x: x[1] / (edit_distance(x[0], wrong) - min_edit_distance + 1))[0]
 
             if corrected == correct:
                 working += 1
